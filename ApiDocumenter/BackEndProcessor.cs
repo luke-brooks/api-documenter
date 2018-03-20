@@ -1,29 +1,16 @@
 ﻿using System;
+using System.Data;
 using System.Collections.Generic;
 using System.Linq;
 using System.Text;
 using System.Net.Http;
 using System.Reflection;
+using ApiDocumenter.Models;
 
 namespace ApiDocumenter
 {
-    public static class Documenter
+    public static partial class ApiDocumentationProcessor
     {
-        private const string START_LIST = "[";
-        private const string END_LIST = "]";
-        private const string START_OBJECT = "{\n";
-        private const string END_OBJECT = "}";
-
-        private const string LINE_BREAK = "\n";
-        private const string TAB = "\t";
-        private const string COMMA = ",";
-
-        private const string STR_PROP = "\"{0}\": \"\"";
-        private const string NUM_PROP = "\"{0}\": 0";
-        private const string EMPTY_LIST_PROP = "\"{0}\": []";
-        private const string FILLED_LIST_PROP = "\"{0}\": [\n";
-
-        private static int _jsonBuildCurrentCall = 0;
 
         public static List<ApiControllerInformation> CreateApiDocumentation(List<Type> types, Type controllerParentType)
         {
@@ -35,11 +22,10 @@ namespace ApiDocumenter
                 {
                     var tempInfo = new ApiControllerInformation()
                     {
-                        ControllerName = t.Name,
-                        Environment = "NEED ENVIRONMENT SPECIFIC INFO"
+                        ControllerName = t.Name
                     };
 
-                    tempInfo.Methods = ShowControllerMethods(t.UnderlyingSystemType);
+                    tempInfo.Methods = ProcessControllerMethods(t.UnderlyingSystemType);
 
                     controllerInfo.Add(tempInfo);
                 }
@@ -48,7 +34,7 @@ namespace ApiDocumenter
             return controllerInfo;
         }
 
-        private static List<MethodInformation> ShowControllerMethods(Type type)
+        private static List<MethodInformation> ProcessControllerMethods(Type type)
         {
             var methodList = new List<MethodInformation>();
 
@@ -59,7 +45,8 @@ namespace ApiDocumenter
                     var tempMethod = new MethodInformation()
                     {
                         Name = method.Name,
-                        ReturnType = BuildTypeInformation(method.ReturnType)
+                        ReturnType = BuildTypeInformation(method.ReturnType),
+                        Attributes = GetAttributeTags(method)
                     };
 
                     var parameters = method.GetParameters();
@@ -101,6 +88,40 @@ namespace ApiDocumenter
             }
 
             return isGeneric;
+        }
+
+        private static List<string> GetAttributeTags(MethodInfo method)
+        {
+            var attributes = new List<string>();
+
+            foreach (var a in method.CustomAttributes)
+            {
+                if (a.AttributeType == typeof(System.Web.Http.HttpGetAttribute) ||
+                        a.AttributeType == typeof(System.Web.Mvc.HttpGetAttribute))
+                {
+                    attributes.Add(Constants.GET);
+                }
+
+                if (a.AttributeType == typeof(System.Web.Http.HttpPostAttribute) ||
+                        a.AttributeType == typeof(System.Web.Mvc.HttpPostAttribute))
+                {
+                    attributes.Add(Constants.POST);
+                }
+
+                if (a.AttributeType == typeof(System.Web.Http.HttpPutAttribute) ||
+                        a.AttributeType == typeof(System.Web.Mvc.HttpPutAttribute))
+                {
+                    attributes.Add(Constants.PUT);
+                }
+
+                if (a.AttributeType == typeof(System.Web.Http.HttpDeleteAttribute) ||
+                        a.AttributeType == typeof(System.Web.Mvc.HttpDeleteAttribute))
+                {
+                    attributes.Add(Constants.DELETE);
+                }
+            }
+
+            return attributes;
         }
 
         private static TypeInformation BuildTypeInformation(Type typeToBuild)
@@ -226,6 +247,10 @@ namespace ApiDocumenter
                 // nullable type, check if the nested type is simple
                 return IsComplexObject(type.GetGenericArguments()[0]);
             }
+            if (type.IsArray)
+            {
+                return IsComplexObject(type.GetElementType());
+            }
 
             if (type.Equals(typeof(string)))
             {
@@ -235,7 +260,7 @@ namespace ApiDocumenter
             {
                 return false;
             }
-            if (type.Equals(typeof(DateTime)))
+            if (type.Equals(typeof(DataTable)))
             {
                 return false;
             }
@@ -308,8 +333,6 @@ namespace ApiDocumenter
         {
             var builder = new StringBuilder();
 
-            _jsonBuildCurrentCall = 0;
-
             var jsonObj = CreateStringObject(complexProps, builder);
 
             return jsonObj;
@@ -317,81 +340,60 @@ namespace ApiDocumenter
 
         private static string CreateStringObject(List<TypeInformation> complexProps, StringBuilder builder)
         {
-            builder.Append(TAB.Multiply(_jsonBuildCurrentCall));
-            builder.Append(START_OBJECT);
+            builder.Append(Constants.START_OBJECT);
 
             var count = 1;
             foreach (var prop in complexProps)
             {
-                builder.Append(TAB);
-                builder.Append(TAB.Multiply(_jsonBuildCurrentCall));
-
                 if (prop.Type.Contains("System.Int") || prop.Type.Contains("System.Decimal"))
                 {
-                    builder.Append(TAB.Multiply(_jsonBuildCurrentCall));
-                    builder.Append(String.Format(NUM_PROP, prop.Name));
+                    builder.Append(String.Format(Constants.NUM_PROP, prop.Name));
                 }
                 else if (prop.Type.Contains("System.Collections.Generic"))
                 {
                     if (prop.ComplexProperties.Count > 0)
                     {
-                        builder.Append(TAB.Multiply(_jsonBuildCurrentCall));
-                        builder.Append(String.Format(FILLED_LIST_PROP, prop.Name));
-                        builder.Append(TAB);
-                        builder.Append(TAB);
-
-                        _jsonBuildCurrentCall++;
+                        builder.Append(String.Format(Constants.FILLED_LIST_PROP, prop.Name));
 
                         var innerObj = CreateStringObject(prop.ComplexProperties, new StringBuilder());
 
-                        _jsonBuildCurrentCall--;
-
-                        int index = innerObj.LastIndexOf("}");
-                        innerObj = innerObj.Insert(index, TAB + TAB);
-
                         builder.Append(innerObj);
-                        builder.Append(LINE_BREAK);
-                        builder.Append(TAB);
-                        builder.Append(TAB.Multiply(_jsonBuildCurrentCall));
-                        builder.Append(END_LIST);
+                        builder.Append(Constants.LINE_BREAK);
+                        builder.Append(Constants.END_LIST);
                     }
                     else
                     {
-                        builder.Append(TAB.Multiply(_jsonBuildCurrentCall));
-                        builder.Append(EMPTY_LIST_PROP);
+                        builder.Append(String.Format(Constants.EMPTY_LIST_PROP, prop.Name));
                     }
                 }
                 else
                 {
-                    builder.Append(TAB.Multiply(_jsonBuildCurrentCall));
-                    builder.Append(String.Format(STR_PROP, prop.Name));
+                    if (prop.ComplexProperties.Count > 0)
+                    {
+                        var innerObj = CreateStringObject(prop.ComplexProperties, new StringBuilder());
+
+                        builder.Append(String.Format(Constants.COMPLEX_PROP, prop.Name));
+                        builder.Append(innerObj);
+                    }
+                    else
+                    {
+                        builder.Append(String.Format(Constants.STR_PROP, prop.Name));
+                    }
                 }
 
                 if (count != complexProps.Count)
                 {
-                    builder.Append(COMMA);
+                    builder.Append(Constants.COMMA);
                 }
 
-                builder.Append(LINE_BREAK);
+                builder.Append(Constants.LINE_BREAK);
 
                 count++;
             }
 
-            builder.Append(TAB.Multiply(_jsonBuildCurrentCall));
-            builder.Append(END_OBJECT);
+            builder.Append(Constants.END_OBJECT);
 
             return builder.ToString();
-        }
-
-        private static string Multiply(this string source, int multiplier)
-        {
-            StringBuilder sb = new StringBuilder(multiplier * source.Length);
-            for (int i = 0; i < multiplier; i++)
-            {
-                sb.Append(source);
-            }
-
-            return sb.ToString();
         }
     }
 }

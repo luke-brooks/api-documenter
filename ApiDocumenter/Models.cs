@@ -1,11 +1,10 @@
 ﻿using System.Collections.Generic;
 
-namespace ApiDocumenter
+namespace ApiDocumenter.Models
 {
     public class ApiControllerInformation
     {
         public string ControllerName { get; set; }
-        public string Environment { get; set; }
         public List<MethodInformation> Methods { get; set; }
 
         public ApiControllerInformation()
@@ -19,10 +18,12 @@ namespace ApiDocumenter
         public string Name { get; set; }
         public List<TypeInformation> Parameters { get; set; }
         public TypeInformation ReturnType { get; set; }
+        public List<string> Attributes { get; set; }
 
         public MethodInformation()
         {
             Parameters = new List<TypeInformation>();
+            Attributes = new List<string>();
         }
     }
 
@@ -36,6 +37,19 @@ namespace ApiDocumenter
         public TypeInformation()
         {
             ComplexProperties = new List<TypeInformation>();
+        }
+    }
+
+    public class TestObject
+    {
+        public string Name { get; set; }
+        public List<string> Things { get; set; }
+        public List<TypeInformation> OtherThings { get; set; }
+
+        public TestObject()
+        {
+            Things = new List<string>();
+            OtherThings = new List<TypeInformation>();
         }
     }
 }
