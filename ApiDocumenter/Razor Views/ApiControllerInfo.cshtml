@@ -1,0 +1,169 @@
+﻿@model ApiDocumenter.PageModel
+@using ApiDocumenter.Models;
+
+<style>
+    .param-type {
+        color: #1C84C6;
+    }
+
+    .method-list {
+        list-style-type: none;
+    }
+
+    body.modal-open {
+        overflow: visible;
+    }
+</style>
+
+@helper WriteComplexObject(TypeInformation complexObject)
+{
+    <div>
+        <strong><a class="complex-object-name">@complexObject.Type</a></strong>
+        <ul>
+            @foreach (var prop in complexObject.ComplexProperties)
+            {
+                <li><span class="param-type">@prop.Type</span>  <strong>@prop.Name</strong></li>
+            }
+        </ul>
+    </div>
+    foreach (var obj in complexObject.ComplexProperties.Where(x => x.ComplexProperties.Count > 0).ToList())
+    {
+            @WriteComplexObject(obj)
+    }
+}
+
+<div class="row">
+    <div class="col col-lg-12">
+        <div class="panel panel-default">
+            <div class="panel-heading">
+                <h2 class="h4">@Model.CurrentApi.ControllerName API Information</h2>
+            </div>
+            <div class="panel-body">
+                <div class="col col-sm-8 col-lg-10 col-lg-offset-1">
+                    <div class="row">
+                        <div>
+                            @foreach (var method in Model.CurrentApi.Methods.OrderBy(x => x.Name))
+                            {
+                                <div class="panel panel-default">
+                                    @{ 
+                                        var complexObjectJsons = method.Parameters.Where(x => x.ComplexProperties.Any()).ToList();
+                                        if (method.ReturnType.ComplexProperties.Any())
+                                        {
+                                            complexObjectJsons.Add(method.ReturnType);
+                                        }
+                                    }
+                                    <div class="panel-heading">
+                                        <h3 class="panel-title">
+                                            <a id="@method.Name" class="methodClick">@method.Name<text>()</text></a>
+                                        </h3>
+                                    </div>
+                                    <div class="panel-body panel-collapse collapse @method.Name">
+                                        <div class="">
+                                            <div>
+                                                <div class="col-lg-8">
+                                                    @if (method.Attributes.Any())
+                                                    {
+                                                        <div class="row">
+                                                            <strong>Method Attributes</strong>:
+                                                            @foreach (var a in method.Attributes)
+                                                            {
+                                                                <ul>
+                                                                    <li><a href="@Model.ApiId/@Model.CurrentApi.ControllerName/@method.Name/@a" class="method-attr">@a</a></li>
+                                                                </ul>
+                                                            }
+                                                        </div>
+                                                    }
+                                                    <div class="row">
+                                                        <strong>Method Return Type</strong>:
+                                                        <ul>
+                                                            <li><span class="param-type">@method.ReturnType.Type</span></li>
+                                                        </ul>
+                                                    </div>
+                                                    @if (method.Parameters.Count > 0)
+                                                    {
+                                                        <div class="row">
+                                                            <strong>Parameters</strong>:
+                                                        </div>
+                                                        <div class="row">
+                                                            <ul class="param-list">
+                                                                @foreach (var param in method.Parameters.OrderBy(x => x.Name))
+                                                                {
+                                                                    <li>
+                                                                        <text><span class="param-type">@param.Type</span> @param.Name</text>
+                                                                    </li>
+                                                                }
+                                                            </ul>
+                                                        </div>
+                                                    }
+                                                    else
+                                                    {
+                                                        <div class="row">
+                                                            <strong>This method has no Parameters</strong>
+                                                        </div>
+                                                    }
+                                                    @if (complexObjectJsons.Any())
+                                                    {
+                                                        <hr />
+                                                        <div class="row">
+                                                            <strong>Complex Object Info</strong>:
+                                                        </div>
+
+                                                        if (method.ReturnType.ComplexProperties.Count > 0)
+                                                        {
+                                                            @WriteComplexObject(method.ReturnType)
+                                                        }
+
+                                                        foreach (var param in method.Parameters.Where(x => x.ComplexProperties.Any()))
+                                                        {
+                                                            @WriteComplexObject(param)
+                                                        }
+
+                                                        <div class="row">
+                                                            <strong>Json Objects</strong>:
+                                                        </div>
+
+                                                        foreach (var obj in complexObjectJsons)
+                                                        {
+                                                            <div>
+                                                                @if (!String.IsNullOrEmpty(obj.JsonObject))
+                                                                {
+                                                                    <div>
+                                                                        @{ var currentGuid = Guid.NewGuid().ToString(); }
+                                                                        <a id="@currentGuid" class="methodClick">@obj.Type</a>
+                                                                        <div class="collapse @currentGuid">
+                                                                            <textarea style="width: 500px; height: 140px; padding: 5px;" readonly>@obj.JsonObject</textarea>
+                                                                        </div>
+                                                                    </div>
+                                                                }
+                                                            </div>
+                                                        }
+                                                    }
+                                                </div>
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
+                            }
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+@section scripts{
+    <script>
+
+        $('.methodClick').on('click', function () {
+            var methodName = '.' + $(this).prop("id");
+
+            if ($(methodName).hasClass("open")) {
+                $(methodName).slideUp().removeClass("open");
+            }
+            else {
+                $(methodName).slideDown().addClass("open");
+            }
+        });
+    </script>
+}

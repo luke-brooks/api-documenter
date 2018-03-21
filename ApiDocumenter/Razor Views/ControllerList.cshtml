@@ -1,0 +1,27 @@
+﻿@model ApiDocumenter.PageModel
+
+<div class="row">
+    <div class="col col-lg-12">
+        <div class="panel panel-default">
+            <div class="panel-heading">
+                <h2 class="h4">My API Controllers</h2>
+            </div>
+            <div class="panel-body">
+                <div class="col col-sm-8 col-lg-10 col-lg-offset-1">
+                    <div class="row">
+                        <div class="panel panel-default">
+                            <div class="row" style="display: flex; flex-direction: row; flex-wrap: wrap; justify-content: center;">
+                                @foreach (var api in Model.ApiInfo.OrderBy(x => x.ControllerName))
+                                {
+                                    <div class="panel-body" align="center">
+                                        <a class="btn btn-primary btn-lg" style="margin: 8px; width: 24%; white-space: normal;" href="~/@Model.ApiId/@api.ControllerName">@api.ControllerName API</a>
+                                    </div>
+                                }
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>

@@ -1,0 +1,337 @@
+﻿@model ApiDocumenter.PageModel
+@using ApiDocumenter.Models;
+
+<style>
+    .param-type {
+        color: #1C84C6;
+    }
+
+    .method-list {
+        list-style-type: none;
+    }
+
+    body.modal-open {
+        overflow: visible;
+    }
+</style>
+
+@helper WriteParameters(List<TypeInformation> parameters, string objectId, string parentId = "top") 
+{
+    foreach (var p in parameters)
+    {
+        if (p.ComplexProperties.Any())
+        {
+            <label for="@p.Name">@p.Name:</label>
+            <div id="@p.Name" class="panel-body" data-object-id="@objectId" data-parent-id="@parentId" data-param-type="@p.Type">
+                @WriteParameters(p.ComplexProperties, Guid.NewGuid().ToString(), parentId: objectId)
+            </div>
+        }
+        else
+        {
+            @WriteParameterInput(p.Name, p.Type, objectId, parentId)
+        }
+    }
+}
+
+@helper WriteParameterInput(string paramName, string paramType, string objectId, string parentId)
+{
+    <div data-object-id="@objectId" data-parent-id="@parentId" data-param-type="@paramType">
+        <label for="@paramName">@paramName:</label>
+        @switch (paramType.ToUpper())
+        {
+            case "INT32":
+            case "INT64":
+            case "DECIMAL":
+            case "DOUBLE":
+            case "INT32[]":
+            case "INT64[]":
+            case "DECIMAL[]":
+            case "DOUBLE[]":
+            case "INT32?":
+            case "INT64?":
+            case "DECIMAL?":
+            case "DOUBLE?":
+                <input id="@paramName" type="number" value="0" step="1" class="param-input"  style="width:100px" />
+                break;
+            case "DATETIME":
+            case "DATETIME?":
+                <input id="@paramName" type="date" class="param-input" />
+                break;
+            case "BOOLEAN":
+                <select id="@paramName" class="param-input">
+                    <option value="false">false</option>
+                    <option value="true">true</option>
+                </select>
+                break;
+            case "BOOLEAN?":
+                <select id="@paramName" class="param-input">
+                    <option value="">null</option>
+                    <option value="false">false</option>
+                    <option value="true">true</option>
+                </select>
+                break;
+            default:
+                <input id="@paramName" type="text" class="param-input" style="width:250px" />
+                break;
+        }
+        <label for="data-type">Data Type:</label>
+        <input id="data-type" type="text" value="@paramType" readonly />
+    </div>
+}
+
+<div class="row" id="method-post-tester-view">
+    <div class="col col-lg-12">
+        <div class="panel panel-default">
+            <div class="panel-heading">
+                <h2 class="h4">@Model.CurrentMethod.Name Method Tester</h2>
+            </div>
+            <div class="panel-body">
+                <div class="col col-sm-8 col-lg-10 col-lg-offset-1">
+                    <div class="row">
+                        <div id="post-submit-view" class="panel panel-default">
+                            <div class="panel-heading">
+                                <h3 class="panel-title">Method Submission Info</h3>
+                            </div>
+                            <div class="panel-body">
+                                <div id="production-warning" class="error alert-danger jumbotron" hidden>
+                                    <h2><strong>BE WARNED - YOU ARE SUBMITTING TO THE PRODUCTION SERVICES URL</strong></h2>
+                                </div>
+                                @if (Model.ApiId.ToUpper().Equals("SERVICES".ToUpper()))
+                                {
+                                    <div>
+                                        <label for="base-url">Base URL:</label>
+                                        <input id="base-url" type="text" style="width:500px" readonly />
+                                    </div>
+                                }
+                                <div>
+                                    <label for="extended-url">Extended URL:</label>
+                                    <input id="extended-url" type="text" style="width:500px" readonly />
+                                </div>
+                                <div id="json-data-view" hidden>
+                                    <label for="json-data">JSON Data:</label>
+                                    <textarea id="json-data" class="form-control" style="width: 900px; height: 500px; padding: 5px;" readonly ></textarea>
+                                </div>
+                                @if (Model.CurrentMethod.Parameters.Any())
+                                {
+                                    <div id="submit-data-view" hidden>
+                                        <button id="submit-post" class="btn btn-primary">Execute @Model.CurrentMethod.Name POST</button>
+                                    </div>
+                                }
+                                else
+                                {
+                                    <div id="submit-data-view">
+                                        <button id="submit-post" class="btn btn-primary">Execute @Model.CurrentMethod.Name POST</button>
+                                    </div>
+                                }
+                                <div id="loading-submit-view" class="jumbotron alert-info" hidden>
+                                    <div><h3>Loading...</h3></div>
+                                </div>
+                            </div>
+                        </div>
+                        @if (Model.CurrentMethod.Parameters.Any())
+                        {
+                            <div id="parameter-view" class="panel panel-default">
+                                <div class="panel-heading">
+                                    <h3 class="panel-title">
+                                        @Model.CurrentMethod.Name Parameters
+                                    </h3>
+                                </div>
+                                <div class="panel-body">
+
+                                    @WriteParameters(Model.CurrentMethod.Parameters, objectId: Guid.NewGuid().ToString())
+
+                                    <div>
+                                        <button id="prepare-data" class="btn btn-primary">Prepare Data</button>
+                                    </div>
+                                    <div id="param-error" class="not-visible" hidden>
+                                        <label for="error-msg" class="error alert-danger">Not all of the Parameters have been filled</label>
+                                        <input id="error-msg" type="hidden" />
+                                    </div>
+                                </div>
+                            </div>
+                        }
+                        else
+                        {
+                            <div id="param-error" class="not-visible" hidden>
+                            </div>
+                        }
+                        <div id="post-response-view" class="panel panel-default" hidden>
+                            <div class="panel-heading">
+                                <h3 class="panel-title">@Model.CurrentMethod.Name Response Data</h3>
+                            </div>
+                            <div class="panel-body">
+                                <div id="raw-data-view">
+                                    <textarea id="post-data" class="form-control" style="width: 900px; height: 500px; padding: 5px;" readonly></textarea>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script>
+    $(window).load(function () {
+        var baseUrl = getDomain(); // this should get the appropriate environment URL if your API is in a different domain
+
+        $('#base-url').val(baseUrl);
+        $('#extended-url').val('/api/' + '@Model.CurrentApi.ControllerName' + '/' + '@Model.CurrentMethod.Name'); // this assumes the standard API URL used in ASP.NET MVC
+
+        if ((baseUrl.toLowerCase().indexOf('dev') == -1) && (baseUrl.toLowerCase().indexOf('qa') == -1)) { // edit to match your own test environment URLs
+            $('#production-warning').show();
+        }
+    });
+
+    $('.param-input').on('change', function () {
+        $('#submit-data-view').hide();
+    });
+
+    $('#prepare-data').click(function () {
+        $('#param-error').hide().addClass('not-visible');
+
+        var allParamsFilled = true;
+
+        var jsonObj = buildJsonObj($("div[data-parent-id='top']"), true);
+
+        if (!allParamsFilled) {
+            $('#param-error').show().removeClass('not-visible');
+        }
+
+        $('#json-data').val(JSON.stringify(jsonObj, null, 4));
+        $('#json-data-view').show();
+        $('#submit-data-view').show();
+    });
+
+    $('#submit-post').click(function () {
+        if (!$('#param-error').hasClass('not-visible')) {
+            swal({
+                title: "Missing Parameters!",
+                text: "Not having all of the Parameters filled could cause the @Model.CurrentMethod.Name method to create an error or bad data.",
+                type: "warning",
+                closeOnConfirm: false,
+                confirmButtonClass: "btn-danger",
+                confirmButtonText: "OK"
+            },
+            function (isConfirm) {
+                executePost();
+            });
+        }
+        else {
+            executePost();
+        }
+    });
+
+    function buildJsonObj(elementArr, firstIteration) {
+        var jsonObj = new Object();
+
+        elementArr.each(function (index, value) {
+            var objId = $(value).data('object-id');
+
+            var checkForComplexProps = $(value).prop("id");
+            var checkForList = $(value).data('param-type');
+
+            if (firstIteration && checkForComplexProps) {
+                jsonObj = checkForListOrArray(checkForList, buildJsonObj($(elementArr).children("div[data-parent-id='" + objId + "']")));
+            }
+            else {
+                if (checkForComplexProps) {
+                    jsonObj[checkForComplexProps] = checkForListOrArray(checkForList, buildJsonObj($(elementArr).children("div[data-parent-id='" + objId + "']")));
+                }
+                else {
+                    var paramName = $(value).children('.param-input').prop('id');
+                    var paramValue = $(value).children('.param-input').val().trim();
+
+                    jsonObj[paramName] = checkForListOrArray(checkForList, paramValue);
+                }
+            }
+        });
+
+        return jsonObj;
+    }
+
+    function checkForListOrArray(dataType, obj) {
+        var result = obj;
+
+        if (dataType.toLowerCase().indexOf('list<') != -1 || dataType.indexOf('[]') != -1) {
+            result = [obj];
+        }
+
+        return result;
+    }
+
+    function executePost(data) {
+        swal({
+            title: "Are you sure you want to Execute POST on @Model.CurrentMethod.Name?",
+            text: "This can potentially change data in our system.",
+            type: "warning",
+            showCancelButton: true,
+            confirmButtonClass: "btn-danger",
+            confirmButtonText: "Yes, Execute POST!",
+            cancelButtonText: "No, cancel the Execute POST!",
+            closeOnConfirm: true,
+            closeOnCancel: true,
+            showLoaderOnConfirm: false
+        },
+        function (isConfirm) {
+            if (isConfirm) {
+                var url = '';
+
+                if ($('#base-url').val()) {
+                    url = $('#base-url').val() + $('#extended-url').val();
+                }
+                else {
+                    url = $('#extended-url').val();
+                }
+
+                var myData = buildJsonObj($("div[data-parent-id='top']"), true);
+
+                $('#loading-submit-view').show();
+
+                $.ajax({
+                    type: "POST",
+                    url: url,
+                    data: JSON.stringify(myData),
+                    contentType: "application/json",
+                    dataType: "json",
+                    success: function (response) {
+                        $('#post-response-view').show();
+
+                        $('#post-data').val(JSON.stringify(response, null, 4));
+
+                        swal({
+                            title: 'Success!',
+                            text: 'Thanks for all the fish.',
+                            type: 'success',
+                            showCancelButton: false,
+                            confirmButtonText: 'Ok',
+                            closeOnConfirm: true
+                        });
+                    },
+                    error: function (err) {
+                        $('#post-response-view').show();
+
+                        $('#post-data').val("Status Code: " + err.status + " " + err.statusText + "\n" +
+                                            "Response Text: " + err.responseText);
+
+                        swal({
+                            title: 'Failed!',
+                            text: "The ships hung in the sky in much the same way that bricks don't.",
+                            type: 'error',
+                            showCancelButton: false,
+                            confirmButtonText: 'Ok',
+                            closeOnConfirm: true
+                        });
+                    }
+                })
+                .always(function () {
+                    $('#loading-submit-view').hide();
+                    $('body').removeClass('stop-scrolling');
+                });
+            } else {
+                swal("Cancelled!", "The Execute POST will not be submitted.", "error");
+            }
+        });
+    }
+</script>

@@ -56,5 +56,6 @@
   <ItemGroup>
     <Content Include="obj\Debug\ApiDocumenter.dll" />
   </ItemGroup>
+  <ItemGroup />
   <Import Project="$(MSBuildToolsPath)\Microsoft.CSharp.targets" />
 </Project>
