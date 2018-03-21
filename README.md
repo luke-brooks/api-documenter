@@ -1,5 +1,5 @@
 # api-documenter
-A small app that gathers data about an API and creates a useful documentation.
+A small app that gathers data about an ASP.NET MVC API and creates a living documentation.
 
 The dll for the app is located here : https://github.com/luke-brooks/api-documenter/blob/master/ApiDocumenter/obj/Debug/
 
